@@ -208,3 +208,15 @@ The setup includes three services:
    ```
 
 3. Ensure firewall rules allow traffic on ports 80 and 8080 
+
+4. Checking SSL Status:
+   ```bash
+   # Check SSL certificate generation status
+   docker-compose logs -f traefik | grep -i "acme\|cert\|challenge"
+   
+   # If you see permission errors, fix acme.json permissions:
+   chmod 600 acme.json
+   
+   # Restart Traefik after fixing permissions:
+   docker-compose restart traefik
+   ``` 
