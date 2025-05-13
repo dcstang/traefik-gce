@@ -29,6 +29,8 @@ This project demonstrates a multi-container setup on Google Compute Engine using
    ```bash
    sudo apt-get update
    sudo apt-get install -y docker.io docker-compose
+   sudo add-apt-repository universe && sudo apt-get update
+   sudo apt install python3-setuptools
    sudo usermod -aG docker $USER
    ```
 
@@ -50,12 +52,93 @@ The setup uses Let's Encrypt for automatic SSL certificate generation. To config
 1. Replace `your-email@example.com` in both `traefik.yml` and `docker-compose.yml` with your actual email address
 2. Replace `yourdomain.com` in the docker-compose.yml with your actual domain name
 3. Ensure your domain's DNS records point to your VM's IP address
+   - Add an A record for your domain:
+     - Name: @ (or leave blank, depending on your DNS provider)
+     - Value: Your VM's IP address
+     - TTL: 3600 (or default)
+   - Add A records for each subdomain:
+     - Name: traefik
+     - Value: Your VM's IP address
+     - TTL: 3600 (or default)
+     
+     - Name: whoami
+     - Value: Your VM's IP address
+     - TTL: 3600 (or default)
+     
+     - Name: hello
+     - Value: Your VM's IP address
+     - TTL: 3600 (or default)
+   
+   Note: You can find your VM's IP address using:
+   ```bash
+   gcloud compute instances describe traefik-vm --zone=europe-north2-a --format="get(networkInterfaces[0].accessConfigs[0].natIP)"
+   ```
 4. Make sure ports 80 and 443 are open in your firewall
+5. Create and set proper permissions for acme.json:
+   ```bash
+   touch acme.json
+   chmod 600 acme.json
+   ```
+   This file is used by Let's Encrypt to store certificates and must have restricted permissions (600) to work properly.
 
 The following subdomains will be available with SSL:
 - `traefik.yourdomain.com` - Traefik dashboard
 - `whoami.yourdomain.com` - Whoami service
 - `hello.yourdomain.com` - Python Hello World application
+
+## Network Configuration
+
+To ensure proper network access, you need to configure the following firewall rules on your Google Compute Engine instance:
+
+1. Create a firewall rule for HTTP (port 80):
+   ```bash
+   gcloud compute firewall-rules create allow-http \
+       --direction=INGRESS \
+       --priority=1000 \
+       --network=default \
+       --action=ALLOW \
+       --rules=tcp:80 \
+       --source-ranges=0.0.0.0/0 \
+       --target-tags=http-server
+   ```
+
+2. Create a firewall rule for HTTPS (port 443):
+   ```bash
+   gcloud compute firewall-rules create allow-https \
+       --direction=INGRESS \
+       --priority=1000 \
+       --network=default \
+       --action=ALLOW \
+       --rules=tcp:443 \
+       --source-ranges=0.0.0.0/0 \
+       --target-tags=https-server
+   ```
+
+3. Create a firewall rule for Traefik dashboard (port 8080):
+   ```bash
+   gcloud compute firewall-rules create allow-traefik-dashboard \
+       --direction=INGRESS \
+       --priority=1000 \
+       --network=default \
+       --action=ALLOW \
+       --rules=tcp:8080 \
+       --source-ranges=0.0.0.0/0 \
+       --target-tags=http-server
+   ```
+
+These rules will allow:
+- HTTP traffic on port 80
+- HTTPS traffic on port 443
+- Traefik dashboard access on port 8080
+
+Make sure your VM instance has the correct network tags:
+- `http-server`
+- `https-server`
+
+You can verify the network tags with:
+```bash
+gcloud compute instances describe traefik-vm --zone=europe-north2-a --format="get(tags.items)"
+```
 
 ## Accessing the Services
 
